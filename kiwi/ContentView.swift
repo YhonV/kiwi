@@ -8,21 +8,18 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct Document {
-    var content: String;
-    var fileURL: URL?;
-    var isModified: Bool = false;
-}
-
 struct ContentView: View {
-    @State var currentDocument: Document;
+    @State private var document = Document(content: "", fileURL: nil, isModified: false)
     @State private var showFileExplorer: Bool = false
-    
+    @State private var errorMessage: String = ""
+    @State private var showErrorAlert: Bool = false
+    let documentService = DocumentService()
+
     var body: some View {
         VStack {
             HStack {
                 
-                // Botón de abrir
+                // ===== ABRIR DOCUMENTO =====
                 Button(action: {
                     showFileExplorer = true
                 }){
@@ -33,70 +30,60 @@ struct ContentView: View {
                     allowedContentTypes: [.text],
                     allowsMultipleSelection: false) { result in
                         switch result {
-                        
-                        // caso de éxito
                         case .success(let files):
-                            guard let file = files.first else { return }
-                            let gotAccess = file.startAccessingSecurityScopedResource()
-                            if !gotAccess { return }
-                            // release access al final del codigo
-                            defer { file.stopAccessingSecurityScopedResource()}
-                            do {
-                                currentDocument.fileURL = file
-                                currentDocument.content = try String(contentsOf: file, encoding: .utf8)
-                            } catch {
-                                print("Error")
-                                return
+                            do
+                            {
+                                guard let file = files.first else { return }
+                                document = try documentService.openDocument(file: file)
+                            } catch
+                            {
+                                errorMessage = "Error interno, intente nuevamente."
+                                showErrorAlert = true
                             }
-                        // caso de fallo
-                        case .failure(let error):
-                            print(error)
+                        case .failure(_):
+                            errorMessage = "Error al abrir el archivo, intente nuevamente."
+                            showErrorAlert = true
                         }
                     }
                 
-                // Botón de nuevo documento
+                // ===== NUEVO DOCUMENTO =====
                 Button(action: {
-                    currentDocument = Document(content: "", fileURL: nil, isModified: false)
+                    document = Document(content: "", fileURL: nil, isModified: false)
                 }){
                     Text("Nuevo documento")
                 }
                 
-                // Botón de guardar
+                // ===== GUARDAR DOCUMENTO =====
                 Button(action: {
-                    if let url = currentDocument.fileURL {
+                    if let documentURL = document.fileURL {
                         do {
-                            let gotAccess = url.startAccessingSecurityScopedResource()
-                            if !gotAccess { return }
-                            // release access al terminar el codigo
-                            defer { url.stopAccessingSecurityScopedResource()}
-                            
-                            try currentDocument.content.write(
-                                to: url,
-                                atomically: true,
-                                encoding: .utf8
-                            )
+                            try documentService.saveDocument(documentURL: documentURL, documentContent: document.content)
                         } catch {
-                            print(error)
+                            errorMessage = "Error al guardar el documento, intente nuevamente."
+                            showErrorAlert = true
                         }
+                    } else {
+                        errorMessage = "Este documento aún no tiene ubicación. Usa Guardar como."
+                        showErrorAlert = true
                     }
                 }) {
                     Text("Guardar")
                 }
             }
-            TextEditor(text: $currentDocument.content)
+            TextEditor(text: $document.content)
                 .font(.custom("SFPro", size: 14))
                 .lineSpacing(2)
                 .autocorrectionDisabled(true)
         }
         .padding()
-    }
-    
-    func doNothing()
-    {
-        
+        .alert("Error", isPresented: $showErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
+        }
     }
 }
 
 #Preview {
-    ContentView(currentDocument: Document(content: "", fileURL: nil, isModified: false))
+    ContentView()
 }

@@ -11,7 +11,7 @@ import SwiftUI
 struct kiwiApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView(currentDocument: Document(content: "", fileURL: nil, isModified: false))
+            ContentView()
         }
     }
 }
