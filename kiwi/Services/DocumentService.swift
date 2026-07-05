@@ -13,12 +13,13 @@ enum DocumentServiceError: Error {
 class DocumentService {
     
     func openDocument(file: URL) throws -> Document {
-        var document = Document(content: "", fileURL: nil, isModified: false)
+        var document = Document(fileName: "", content: "", fileURL: nil, isModified: false)
         let gotAccess = file.startAccessingSecurityScopedResource()
         if !gotAccess { throw DocumentServiceError.securityAccessDenied }
         defer { file.stopAccessingSecurityScopedResource()}
         document.fileURL = file
         document.content = try String(contentsOf: file, encoding: .utf8)
+        document.fileName = file.deletingPathExtension().lastPathComponent
         return document
     }
 
